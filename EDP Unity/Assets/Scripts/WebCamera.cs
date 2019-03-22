@@ -75,7 +75,7 @@ public class WebCamera : MonoBehaviour
         ip.Start();
     }
 
-    ARKit.FeaturePoints.ComputeAndSave("agenda.jpg", "Assets/keypoints.yml");
+    ARKit.FeaturePoints.ComputeAndSave("simpsons-orig.jpg", "Assets/keypoints.yml");
     fp = ARKit.FeaturePoints.ReadData("Assets/keypoints.yml", ip.Homography);
   }
 

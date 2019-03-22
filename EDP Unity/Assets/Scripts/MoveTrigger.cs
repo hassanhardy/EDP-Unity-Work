@@ -36,8 +36,6 @@ using UnityEngine;
 
     if (WebCamera.fp != null && WebCamera.ip != null)
     {
-      print("camera is calibrated " + WebCamera.ip.IsCalibrated);
-      print("feature point inlier ratio " + WebCamera.fp.InlierRatio);
       WebCamera.fp.GetPose(WebCamera.ip.CameraMatrix, WebCamera.ip.DistortionCoefficients, out Emgu.CV.Mat rotationMat, out Emgu.CV.Mat translationVector);
 
       if (!rotationMat.IsEmpty && !translationVector.IsEmpty)
@@ -62,9 +60,16 @@ using UnityEngine;
 
         float[] eulers = WebCamera.fp.GetEulerAngles(r3);
 
-        Vector3 angles = new Vector3(eulers[0], eulers[1], eulers[2]);
-
-        transform.Rotate(angles);
+        transform.rotation = Quaternion.Euler(eulers[1], eulers[2], eulers[0]);
+        transform.position = new Vector3(
+          ARKit.MatExtension.GetValue(translationVector, 0, 0),
+          -335 + ARKit.MatExtension.GetValue(translationVector, 0, 2),
+          1263.554f + ARKit.MatExtension.GetValue(translationVector, 0, 1)
+        );
+      } else
+      {
+        transform.rotation = new Quaternion(0, 0, 0, 0);
+        transform.position = new Vector3(-266.1339f, 335, 1263.554f);
       }
     }
   }
