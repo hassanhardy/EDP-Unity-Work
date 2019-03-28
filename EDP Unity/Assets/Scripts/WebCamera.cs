@@ -5,6 +5,9 @@ using UnityEngine.UI;
 
 public class WebCamera : MonoBehaviour
 {
+    public InstantiateBoard MT;
+    private int counter = 0;
+
     private Texture2D backgroundTexture;
     private ARKit.Camera capture;
     static public ARKit.FeaturePoints fp = null;
@@ -55,7 +58,7 @@ public class WebCamera : MonoBehaviour
 
     ARKit.Frame frame;
 
-    this.capture = new ARKit.Camera(1, new ARKit.Size(1080, 720));
+    this.capture = new ARKit.Camera(0, new ARKit.Size(1280, 720));
 
     frame = this.capture.GetNextFrame();
 
@@ -82,22 +85,24 @@ public class WebCamera : MonoBehaviour
 
   private void Update()
   {
-    /*
-    if (!camAvailable)
-        return;
+        /*
+        if (!camAvailable)
+            return;
 
-    float ratio = (float)webCam.width / (float)webCam.height;
+        float ratio = (float)webCam.width / (float)webCam.height;
 
-    fit.aspectRatio = ratio;
+        fit.aspectRatio = ratio;
 
-    float scaleY = webCam.videoVerticallyMirrored ? -1f : 1f;
-    background.rectTransform.localScale = new Vector3(1f, scaleY, 1f);
+        float scaleY = webCam.videoVerticallyMirrored ? -1f : 1f;
+        background.rectTransform.localScale = new Vector3(1f, scaleY, 1f);
 
-    int orient = -webCam.videoRotationAngle;
-    background.rectTransform.localEulerAngles = new Vector3(0, 0, orient);
-    */
+        int orient = -webCam.videoRotationAngle;
+        background.rectTransform.localEulerAngles = new Vector3(0, 0, orient);
+        */
+        //GameObject g = GameObject.FindGameObjectWithTag("MainTrigger");
+        //MT = g.GetComponent<InstantiateBoard>();
 
-    bool tracking = false;
+        bool tracking = false;
 
     if (ip != null && fp != null)
     {
@@ -123,9 +128,16 @@ public class WebCamera : MonoBehaviour
             frame = fp.DrawObjectBorder();
 
           print("object found");
+                    MT.objectFound = true;
+                    counter = 0;
         }
-        else
-          print("object not found");
+                else {
+                    print("object not found");
+                    if(counter >= 30) {
+                        MT.objectFound = false;
+                    }
+                    counter++;                    
+                }
 
         this.backgroundTexture.LoadImage(frame.Image);
 
