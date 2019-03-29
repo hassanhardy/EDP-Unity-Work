@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 ﻿{"cameraMode":{"drawMode":0,"name":"Shaded","section":"Shading Mode"},"sceneLighting":true,"audioPlay":false,"sceneViewState":{"showFog":true,"showMaterialUpdate":false,"showSkybox":true,"showFlares":true,"showImageEffects":true,"showParticleSystems":true},"in2DMode":false,"pivot":{"x":890.251220703125,"y":-25.073410034179689,"z":-240.24819946289063},"rotation":{"x":-0.05799911916255951,"y":0.9415048956871033,"z":-0.2184637188911438,"w":-0.24995657801628114},"size":22.0,"orthographic":false}
+=======
+﻿{"cameraMode":{"drawMode":0,"name":"Shaded","section":"Shading Mode"},"sceneLighting":true,"audioPlay":false,"sceneViewState":{"showFog":true,"showMaterialUpdate":false,"showSkybox":true,"showFlares":true,"showImageEffects":true,"showParticleSystems":true},"in2DMode":false,"pivot":{"x":0.0,"y":0.0,"z":-2610.0},"rotation":{"x":0.02310594543814659,"y":0.9579417109489441,"z":-0.2744235694408417,"w":0.08065696805715561},"size":10.939544677734375,"orthographic":false}
+>>>>>>> 9eff652... Calling Projection Matrix and setting matrix to camera (need to solve bugs)
