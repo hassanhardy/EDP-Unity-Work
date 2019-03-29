@@ -5,7 +5,6 @@ using UnityEngine.UI;
 
 public class WebCamera : MonoBehaviour
 {
-<<<<<<< HEAD
     public InstantiateBoard MT;
     private int counter = 0;
 
@@ -29,28 +28,6 @@ public class WebCamera : MonoBehaviour
     {
         // defaultBackground = background.texture;
         // WebCamDevice[] devices = WebCamTexture.devices;
-=======
-  private Texture2D backgroundTexture;
-  private ARKit.Camera capture;
-  static public ARKit.FeaturePoints fp = null;
-  static public ARKit.InitialFrame ip = null;
-  public bool initialMatchDone = false;
-
-  /*
-  private bool camAvailable;
-  private WebCamTexture webCam;
-  private Texture defaultBackground;
-  */
-
-  public RawImage background;
-  public AspectRatioFitter fit;
-  public Canvas canvas;
-
-  private void Start()
-  {
-    // defaultBackground = background.texture;
-    // WebCamDevice[] devices = WebCamTexture.devices;
->>>>>>> 9eff652... Calling Projection Matrix and setting matrix to camera (need to solve bugs)
 
     /*
     if (devices.Length == 0)
@@ -81,11 +58,7 @@ public class WebCamera : MonoBehaviour
 
     ARKit.Frame frame;
 
-<<<<<<< HEAD
     this.capture = new ARKit.Camera(0, new ARKit.Size(1280, 720));
-=======
-    this.capture = new ARKit.Camera(0, new ARKit.Size(1080, 720));
->>>>>>> 9eff652... Calling Projection Matrix and setting matrix to camera (need to solve bugs)
 
     frame = this.capture.GetNextFrame();
 
