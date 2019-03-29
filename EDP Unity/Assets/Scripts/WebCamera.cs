@@ -5,26 +5,26 @@ using UnityEngine.UI;
 
 public class WebCamera : MonoBehaviour
 {
-    private Texture2D backgroundTexture;
-    private ARKit.Camera capture;
-    static public ARKit.FeaturePoints fp = null;
-    static public ARKit.InitialFrame ip = null;
-    public bool initialMatchDone = false;
+  private Texture2D backgroundTexture;
+  private ARKit.Camera capture;
+  static public ARKit.FeaturePoints fp = null;
+  static public ARKit.InitialFrame ip = null;
+  public bool initialMatchDone = false;
 
-    /*
-    private bool camAvailable;
-    private WebCamTexture webCam;
-    private Texture defaultBackground;
-    */
+  /*
+  private bool camAvailable;
+  private WebCamTexture webCam;
+  private Texture defaultBackground;
+  */
 
-    public RawImage background;
-    public AspectRatioFitter fit;
-    public Canvas canvas;
+  public RawImage background;
+  public AspectRatioFitter fit;
+  public Canvas canvas;
 
-    private void Start()
-    {
-        // defaultBackground = background.texture;
-        // WebCamDevice[] devices = WebCamTexture.devices;
+  private void Start()
+  {
+    // defaultBackground = background.texture;
+    // WebCamDevice[] devices = WebCamTexture.devices;
 
     /*
     if (devices.Length == 0)
@@ -55,7 +55,7 @@ public class WebCamera : MonoBehaviour
 
     ARKit.Frame frame;
 
-    this.capture = new ARKit.Camera(1, new ARKit.Size(1080, 720));
+    this.capture = new ARKit.Camera(0, new ARKit.Size(1080, 720));
 
     frame = this.capture.GetNextFrame();
 
@@ -66,13 +66,13 @@ public class WebCamera : MonoBehaviour
 
     if (System.IO.File.Exists("intrinsics.yml"))
     {
-        ip = new ARKit.InitialFrame();
-        ip.ReadFromFile();
+      ip = new ARKit.InitialFrame();
+      ip.ReadFromFile();
     }
     else
     {
-        ip = new ARKit.InitialFrame(this.capture, new ARKit.Size(4, 7), 30);
-        ip.Start();
+      ip = new ARKit.InitialFrame(this.capture, new ARKit.Size(4, 7), 30);
+      ip.Start();
     }
 
     ARKit.FeaturePoints.ComputeAndSave("simpsons-orig.jpg", "Assets/keypoints.yml");
@@ -131,13 +131,47 @@ public class WebCamera : MonoBehaviour
 
 
 
-        // Camera cam = Camera.main;
-        /*if (this.fp.GetProjectionMatrix(out Matrix4x4 p))
+        Camera cam = Camera.main;
+        if (fp.GetHomography(out Emgu.CV.Mat H))
         {
-          cam.projectionMatrix = p;
+          Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
+          Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
+          for (int i = 0; i < 3; i++)
+          {
+            for (int j = 0; j < 3; j++)
+            {
+              double val = ARKit.MatExtension.GetValue(H, i, j);
+              print("i: " + i.ToString());
+              print("j: " + j.ToString());
+              H_mat[i, j] = val;
 
+              val = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
+              cam_mat[i, j] = val;
+            }
+          }
+          Emgu.CV.Matrix<double> proj = fp.projection_mat(H_mat, cam_mat);
+
+
+          Matrix4x4 proj_mat = Matrix4x4.identity;
+
+
+          for (int i = 0; i < 4; i++)
+          {
+            for (int j = 0; j < 4; j++)
+            {
+              double val = proj[i, j];
+              int val_proj = (int)val;
+
+              proj_mat[i, j] = val_proj;
+            }
+          }
+
+          cam.projectionMatrix = proj_mat;
           print("projection matrix set");
-        }*/
+
+        }
+
+
       }
     }
   }
