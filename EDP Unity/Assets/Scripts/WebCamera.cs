@@ -5,29 +5,29 @@ using UnityEngine.UI;
 
 public class WebCamera : MonoBehaviour
 {
-    public InstantiateBoard MT;
-    private int counter = 0;
+  public InstantiateBoard MT;
+  private int counter = 0;
 
-    private Texture2D backgroundTexture;
-    private ARKit.Camera capture;
-    static public ARKit.FeaturePoints fp = null;
-    static public ARKit.InitialFrame ip = null;
-    public bool initialMatchDone = false;
+  private Texture2D backgroundTexture;
+  private ARKit.Camera capture;
+  public ARKit.FeaturePoints fp = null;
+  public ARKit.InitialFrame ip = null;
+  public bool initialMatchDone = false;
 
-    /*
-    private bool camAvailable;
-    private WebCamTexture webCam;
-    private Texture defaultBackground;
-    */
+  /*
+  private bool camAvailable;
+  private WebCamTexture webCam;
+  private Texture defaultBackground;
+  */
 
-    public RawImage background;
-    public AspectRatioFitter fit;
-    public Canvas canvas;
+  public RawImage background;
+  public AspectRatioFitter fit;
+  public Canvas canvas;
 
-    private void Start()
-    {
-        // defaultBackground = background.texture;
-        // WebCamDevice[] devices = WebCamTexture.devices;
+  private void Start()
+  {
+    // defaultBackground = background.texture;
+    // WebCamDevice[] devices = WebCamTexture.devices;
 
     /*
     if (devices.Length == 0)
@@ -69,44 +69,45 @@ public class WebCamera : MonoBehaviour
 
     if (System.IO.File.Exists("intrinsics.yml"))
     {
-      ip = new ARKit.InitialFrame();
-      ip.ReadFromFile();
+      this.ip = new ARKit.InitialFrame();
+      this.ip.ReadFromFile();
     }
     else
     {
-      ip = new ARKit.InitialFrame(this.capture, new ARKit.Size(4, 7), 30);
-      ip.Start();
+      this.ip = new ARKit.InitialFrame(this.capture, new ARKit.Size(4, 7), 30);
+      this.ip.Start();
     }
 
     ARKit.FeaturePoints.ComputeAndSave("simpsons-orig.jpg", "Assets/keypoints.yml");
-    fp = ARKit.FeaturePoints.ReadData("Assets/keypoints.yml", ip.Homography);
+    this.fp = ARKit.FeaturePoints.ReadData("Assets/keypoints.yml");
+    ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("match.jpg");
   }
 
 
   private void Update()
   {
-        /*
-        if (!camAvailable)
-            return;
+    /*
+    if (!camAvailable)
+        return;
 
-        float ratio = (float)webCam.width / (float)webCam.height;
+    float ratio = (float)webCam.width / (float)webCam.height;
 
-        fit.aspectRatio = ratio;
+    fit.aspectRatio = ratio;
 
-        float scaleY = webCam.videoVerticallyMirrored ? -1f : 1f;
-        background.rectTransform.localScale = new Vector3(1f, scaleY, 1f);
+    float scaleY = webCam.videoVerticallyMirrored ? -1f : 1f;
+    background.rectTransform.localScale = new Vector3(1f, scaleY, 1f);
 
-        int orient = -webCam.videoRotationAngle;
-        background.rectTransform.localEulerAngles = new Vector3(0, 0, orient);
-        */
-        //GameObject g = GameObject.FindGameObjectWithTag("MainTrigger");
-        //MT = g.GetComponent<InstantiateBoard>();
+    int orient = -webCam.videoRotationAngle;
+    background.rectTransform.localEulerAngles = new Vector3(0, 0, orient);
+    */
+    //GameObject g = GameObject.FindGameObjectWithTag("MainTrigger");
+    //MT = g.GetComponent<InstantiateBoard>();
 
-        bool tracking = false;
+    bool tracking = false;
 
     if (ip != null && fp != null)
     {
-      if (!ip.Homography.IsEmpty)
+      /*if (!ip.Homography.IsEmpty)
       {
         var frame = this.capture.GetNextFrame();
 
@@ -137,54 +138,94 @@ public class WebCamera : MonoBehaviour
                         MT.objectFound = false;
                     }
                     counter++;                    
-                }
+                }*/
 
-        this.backgroundTexture.LoadImage(frame.Image);
+      this.fp.ComputeAndMatch();
+      MT.objectFound = this.fp.FindObject();
+      ARKit.Frame frame = this.fp.DrawObjectBorder();
+      this.backgroundTexture.LoadImage(frame.Image);
 
-
-
-        Camera cam = Camera.main;
-        if (fp.GetHomography(out Emgu.CV.Mat H))
+      Camera cam = Camera.main;
+      if (fp.GetHomography(out Emgu.CV.Mat H))
+      {
+        Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
+        Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
+        for (int i = 0; i < 3; i++)
         {
-          Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
-          Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
-          for (int i = 0; i < 3; i++)
+          for (int j = 0; j < 3; j++)
           {
-            for (int j = 0; j < 3; j++)
-            {
-              double val = ARKit.MatExtension.GetValue(H, i, j);
-              print("i: " + i.ToString());
-              print("j: " + j.ToString());
-              H_mat[i, j] = val;
-
-              val = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
-              cam_mat[i, j] = val;
-            }
+            H_mat[i, j] = ARKit.MatExtension.GetValue(H, i, j);
+            cam_mat[i, j] = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
           }
-          Emgu.CV.Matrix<double> proj = fp.projection_mat(H_mat, cam_mat);
+        }
+        Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
 
+        Matrix4x4 proj_mat = Matrix4x4.identity;
 
-          Matrix4x4 proj_mat = Matrix4x4.identity;
-
-
-          for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++)
+        {
+          for (int j = 0; j < 4; j++)
           {
-            for (int j = 0; j < 4; j++)
-            {
-              double val = proj[i, j];
-              int val_proj = (int)val;
-
-              proj_mat[i, j] = val_proj;
-            }
+            proj_mat[i, j] = (float)proj[i, j];
           }
-
-          cam.projectionMatrix = proj_mat;
-          print("projection matrix set");
-
         }
 
-
+        cam.projectionMatrix =  proj_mat;
+        print("projection matrix set");
+        //print(cam.fieldOfView.ToString());
+        print(cam.projectionMatrix.rotation.ToString());
+        print(cam.projectionMatrix.ToString());
+        //print("top " + cam.projectionMatrix.decomposeProjection.top + " bottom " + cam.projectionMatrix.decomposeProjection.bottom
+        //  + " right " + cam.projectionMatrix.decomposeProjection.right + " left " + cam.projectionMatrix.decomposeProjection.left
+        //  + " znear " + cam.projectionMatrix.decomposeProjection.zNear + " zfar " + cam.projectionMatrix.decomposeProjection.zFar);
       }
+
+      //ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("track.jpg");
+
+      //this.fp.TrackObject();
+      //MT.objectFound = this.fp.FindObject(false);
+      //frame = this.fp.DrawObjectBorder();
+      //this.backgroundTexture.LoadImage(frame.Image);
+
+      //if (fp.GetHomography(out H))
+      //{
+      //  Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
+      //  Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
+      //  for (int i = 0; i < 3; i++)
+      //  {
+      //    for (int j = 0; j < 3; j++)
+      //    {
+      //      double val = ARKit.MatExtension.GetValue(H, i, j);
+      //      print("i: " + i.ToString());
+      //      print("j: " + j.ToString());
+      //      H_mat[i, j] = val;
+
+      //      val = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
+      //      cam_mat[i, j] = val;
+      //    }
+      //  }
+      //  Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
+
+
+      //  Matrix4x4 proj_mat = Matrix4x4.identity;
+
+
+      //  for (int i = 0; i < 4; i++)
+      //  {
+      //    for (int j = 0; j < 4; j++)
+      //    {
+      //      double val = proj[i, j];
+      //      int val_proj = (int)val;
+
+      //      proj_mat[i, j] = val_proj;
+      //    }
+      //  }
+
+      //  cam.projectionMatrix = proj_mat;
+      //  print("projection matrix set");
+
+      //}
+
     }
   }
 }
