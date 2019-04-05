@@ -140,9 +140,14 @@ public class WebCamera : MonoBehaviour
                     counter++;                    
                 }*/
 
+      ARKit.Frame frame;
+
       this.fp.ComputeAndMatch();
       MT.objectFound = this.fp.FindObject();
-      ARKit.Frame frame = this.fp.DrawObjectBorder();
+      if (this.fp.GetPose(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat r, out Emgu.CV.Mat t))
+        frame = this.fp.DrawObjectBorder(true, this.ip.CameraMatrix, this.ip.DistortionCoefficients, r, t);
+      else
+        frame = this.fp.DrawObjectBorder();
       this.backgroundTexture.LoadImage(frame.Image);
 
       Camera cam = Camera.main;
@@ -158,23 +163,110 @@ public class WebCamera : MonoBehaviour
             cam_mat[i, j] = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
           }
         }
-        Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
+        this.fp.GetPose(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat rotationMat, out Emgu.CV.Mat translationVector);
 
-        Matrix4x4 proj_mat = Matrix4x4.identity;
+        Vector3 position = new Vector3()
+        {
+          x = ARKit.MatExtension.GetValue(translationVector, 0, 0),
+          y = ARKit.MatExtension.GetValue(translationVector, 1, 0),
+          z = -ARKit.MatExtension.GetValue(translationVector, 2, 0)
+        };
 
-        for (int i = 0; i < 4; i++)
+        Emgu.CV.CvInvoke.Rodrigues(rotationMat, rotationMat);
+
+        Matrix4x4 rotation = new Matrix4x4()
+        {
+          m00 = -ARKit.MatExtension.GetValue(rotationMat, 0, 0),
+          m01 = -ARKit.MatExtension.GetValue(rotationMat, 1, 0),
+          m02 = -ARKit.MatExtension.GetValue(rotationMat, 2, 0),
+          m03 = 0,
+          m10 = -ARKit.MatExtension.GetValue(rotationMat, 0, 1),
+          m11 = -ARKit.MatExtension.GetValue(rotationMat, 1, 1),
+          m12 = -ARKit.MatExtension.GetValue(rotationMat, 2, 1),
+          m13 = 0,
+          m20 = ARKit.MatExtension.GetValue(rotationMat, 0, 2),
+          m21 = ARKit.MatExtension.GetValue(rotationMat, 1, 2),
+          m22 = ARKit.MatExtension.GetValue(rotationMat, 2, 2),
+          m23 = 0,
+          m30 = 0,
+          m31 = 0,
+          m32 = 0,
+          m33 = 1,
+        };
+
+        float T, S, X, Y, Z, W;
+
+        T = 1 + rotation[0] + rotation[5] + rotation[10];
+
+        if (T > 0.00000001)
+        {
+          S = Mathf.Sqrt(T) * 2;
+          X = (rotation[9] - rotation[6]) / S;
+          Y = (rotation[2] - rotation[8]) / S;
+          Z = (rotation[4] - rotation[1]) / S;
+          W = 0.25f * S;
+        }
+        else
+        {
+          if (rotation[0] > rotation[5] && rotation[0] > rotation[10])
+          { // Column 0: 
+            S = Mathf.Sqrt((float)(1.0 + rotation[0] - rotation[5] - rotation[10])) * 2;
+            X = 0.25f * S;
+            Y = (rotation[4] + rotation[1]) / S;
+            Z = (rotation[2] + rotation[8]) / S;
+            W = (rotation[9] - rotation[6]) / S;
+
+          }
+          else if (rotation[5] > rotation[10])
+          {     // Column 1: 
+            S = Mathf.Sqrt((float)(1.0 + rotation[5] - rotation[0] - rotation[10])) * 2;
+            X = (rotation[4] + rotation[1]) / S;
+            Y = 0.25f * S;
+            Z = (rotation[9] + rotation[6]) / S;
+            W = (rotation[2] - rotation[8]) / S;
+
+          }
+          else
+          {           // Column 2:
+            S = Mathf.Sqrt((float)(1.0 + rotation[10] - rotation[0] - rotation[5])) * 2;
+            X = (rotation[2] + rotation[8]) / S;
+            Y = (rotation[9] + rotation[6]) / S;
+            Z = 0.25f * S;
+            W = (rotation[4] - rotation[1]) / S;
+          }
+        }
+
+
+        cam.transform.position = -1 * position;
+        cam.transform.rotation = new Quaternion(X, Y, Z, W);
+        print(rotation);
+        print("T " + T + "S " + S + "X " + X + " Y " + Y + " Z " + Z + " W " + W);
+
+        //Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
+        //proj[0, 3] /= 100000;
+        //proj[1, 3] /= -100000;
+        //proj[2, 3] /= -100000;
+
+        //this.fp.GetProjectionMatrix(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat projectionMat);
+
+        //Matrix4x4 proj_mat = Matrix4x4.identity;
+
+        /*for (int i = 0; i < 4; i++)
         {
           for (int j = 0; j < 4; j++)
           {
             proj_mat[i, j] = (float)proj[i, j];
+            //proj_mat[i, j] = (float)ARKit.MatExtension.GetValue(projectionMat, i, j);
           }
-        }
+        }*/
 
-        cam.projectionMatrix =  proj_mat;
-        print("projection matrix set");
+        //cam.worldToCameraMatrix = proj_mat;
+        //print("projection matrix set");
         //print(cam.fieldOfView.ToString());
-        print(cam.projectionMatrix.rotation.ToString());
-        print(cam.projectionMatrix.ToString());
+        //print("world to camera matrix " + cam.worldToCameraMatrix.rotation.ToString());
+        //print("world to camera matrix " + cam.worldToCameraMatrix.ToString());
+        //print("projection matrix " + cam.projectionMatrix.rotation.ToString());
+        // print("projection matrix " + cam.projectionMatrix.ToString());
         //print("top " + cam.projectionMatrix.decomposeProjection.top + " bottom " + cam.projectionMatrix.decomposeProjection.bottom
         //  + " right " + cam.projectionMatrix.decomposeProjection.right + " left " + cam.projectionMatrix.decomposeProjection.left
         //  + " znear " + cam.projectionMatrix.decomposeProjection.zNear + " zfar " + cam.projectionMatrix.decomposeProjection.zFar);
