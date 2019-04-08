@@ -163,31 +163,72 @@ public class WebCamera : MonoBehaviour
             cam_mat[i, j] = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
           }
         }
-        this.fp.GetPose(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat rotationMat, out Emgu.CV.Mat translationVector);
+
+        Matrix4x4 h = new Matrix4x4()
+        {
+          m00 = ARKit.MatExtension.GetValue(H, 0, 0),
+          m01 = ARKit.MatExtension.GetValue(H, 0, 1),
+          m02 = ARKit.MatExtension.GetValue(H, 0, 2),
+          m03 = 0,
+          m10 = ARKit.MatExtension.GetValue(H, 1, 0),
+          m11 = ARKit.MatExtension.GetValue(H, 1, 1),
+          m12 = ARKit.MatExtension.GetValue(H, 1, 2),
+          m13 = 0,
+          m20 = ARKit.MatExtension.GetValue(H, 2, 0),
+          m21 = ARKit.MatExtension.GetValue(H, 2, 1),
+          m22 = ARKit.MatExtension.GetValue(H, 2, 2),
+          m23 = 0,
+          m30 = 0,
+          m31 = 0,
+          m32 = 0,
+          m33 = 1,
+        };
+        Matrix4x4 c = new Matrix4x4()
+        {
+          m00 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 0),
+          m01 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 1),
+          m02 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 2),
+          m03 = (float)0,
+          m10 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 0),
+          m11 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 1),
+          m12 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 2),
+          m13 = (float)0,
+          m20 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 0),
+          m21 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 1),
+          m22 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 2),
+          m23 = (float)0,
+          m30 = (float)0,
+          m31 = (float)0,
+          m32 = (float)0,
+          m33 = (float)1,
+        };
+
+        print("H " + h);
+        print("C " + c);
 
         Vector3 position = new Vector3()
         {
-          x = ARKit.MatExtension.GetValue(translationVector, 0, 0),
-          y = ARKit.MatExtension.GetValue(translationVector, 1, 0),
-          z = -ARKit.MatExtension.GetValue(translationVector, 2, 0)
+          x = -ARKit.MatExtension.GetValue(t, 0, 0),
+          y = ARKit.MatExtension.GetValue(t, 1, 0),
+          z = ARKit.MatExtension.GetValue(t, 2, 0)
         };
 
-        Emgu.CV.CvInvoke.Rodrigues(rotationMat, rotationMat);
+        Emgu.CV.CvInvoke.Rodrigues(r, r);
 
         Matrix4x4 rotation = new Matrix4x4()
         {
-          m00 = -ARKit.MatExtension.GetValue(rotationMat, 0, 0),
-          m01 = -ARKit.MatExtension.GetValue(rotationMat, 1, 0),
-          m02 = -ARKit.MatExtension.GetValue(rotationMat, 2, 0),
-          m03 = 0,
-          m10 = -ARKit.MatExtension.GetValue(rotationMat, 0, 1),
-          m11 = -ARKit.MatExtension.GetValue(rotationMat, 1, 1),
-          m12 = -ARKit.MatExtension.GetValue(rotationMat, 2, 1),
-          m13 = 0,
-          m20 = ARKit.MatExtension.GetValue(rotationMat, 0, 2),
-          m21 = ARKit.MatExtension.GetValue(rotationMat, 1, 2),
-          m22 = ARKit.MatExtension.GetValue(rotationMat, 2, 2),
-          m23 = 0,
+          m00 = ARKit.MatExtension.GetValue(r, 0, 0),
+          m01 = -ARKit.MatExtension.GetValue(r, 0, 1),
+          m02 = -ARKit.MatExtension.GetValue(r, 0, 2),
+          m03 = ARKit.MatExtension.GetValue(t, 0, 0),
+          m10 = ARKit.MatExtension.GetValue(r, 1, 0),
+          m11 = -ARKit.MatExtension.GetValue(r, 1, 1),
+          m12 = -ARKit.MatExtension.GetValue(r, 1, 2),
+          m13 = ARKit.MatExtension.GetValue(t, 1, 0),
+          m20 = ARKit.MatExtension.GetValue(r, 2, 0),
+          m21 = -ARKit.MatExtension.GetValue(r, 2, 1),
+          m22 = -ARKit.MatExtension.GetValue(r, 2, 2),
+          m23 = ARKit.MatExtension.GetValue(t, 2, 0),
           m30 = 0,
           m31 = 0,
           m32 = 0,
@@ -218,7 +259,7 @@ public class WebCamera : MonoBehaviour
 
           }
           else if (rotation[5] > rotation[10])
-          {     // Column 1: 
+          { // Column 1: 
             S = Mathf.Sqrt((float)(1.0 + rotation[5] - rotation[0] - rotation[10])) * 2;
             X = (rotation[4] + rotation[1]) / S;
             Y = 0.25f * S;
@@ -227,7 +268,7 @@ public class WebCamera : MonoBehaviour
 
           }
           else
-          {           // Column 2:
+          { // Column 2:
             S = Mathf.Sqrt((float)(1.0 + rotation[10] - rotation[0] - rotation[5])) * 2;
             X = (rotation[2] + rotation[8]) / S;
             Y = (rotation[9] + rotation[6]) / S;
@@ -236,11 +277,12 @@ public class WebCamera : MonoBehaviour
           }
         }
 
-
+        X = -X; Y = -Y; Z = -Z;
         cam.transform.position = -1 * position;
         cam.transform.rotation = new Quaternion(X, Y, Z, W);
         print(rotation);
         print("T " + T + "S " + S + "X " + X + " Y " + Y + " Z " + Z + " W " + W);
+        print("euler angles " + cam.transform.rotation.eulerAngles);
 
         //Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
         //proj[0, 3] /= 100000;
