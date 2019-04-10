@@ -58,14 +58,14 @@ public class WebCamera : MonoBehaviour
 
     ARKit.Frame frame;
 
-    this.capture = new ARKit.Camera(0, new ARKit.Size(1280, 720));
+    this.capture = new ARKit.Camera(0, new ARKit.Size(1080, 720));
 
     frame = this.capture.GetNextFrame();
 
     this.backgroundTexture = new Texture2D(frame.Width, frame.Height);
     background.texture = this.backgroundTexture; // set texture to webcam frames
     // referenced from https://answers.unity.com/questions/23891/resizing-an-object.html
-    canvas.transform.localScale = new Vector3((float)frame.Width / (float)frame.Height, 1, 1); // fix resolution of plane
+    fit.aspectRatio = (float)1080 / (float)720; // fix resolution of plane
 
     if (System.IO.File.Exists("intrinsics.yml"))
     {
@@ -145,8 +145,9 @@ public class WebCamera : MonoBehaviour
       Camera cam = Camera.main;
 
       // arbitrary switch for testing
-      if (counter == 10)
-        ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("track.jpg");
+      int nextImg = Mathf.FloorToInt(counter / 10);
+      if (nextImg > 0 && nextImg < 9)
+        ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("track" + nextImg + ".jpg");
 
       // arbitrary condition for testing
       if (counter < 10)
