@@ -103,7 +103,7 @@ public class WebCamera : MonoBehaviour
     //GameObject g = GameObject.FindGameObjectWithTag("MainTrigger");
     //MT = g.GetComponent<InstantiateBoard>();
 
-    bool tracking = false;
+    bool tracking = false, gotPose = false;
 
     if (ip != null && fp != null)
     {
@@ -141,53 +141,65 @@ public class WebCamera : MonoBehaviour
                 }*/
 
       ARKit.Frame frame;
+      Emgu.CV.Mat r, t, H;
+      Camera cam = Camera.main;
 
-      this.fp.ComputeAndMatch();
-      MT.objectFound = this.fp.FindObject();
-      Emgu.CV.Mat ccc = new Emgu.CV.Mat(3, 3, Emgu.CV.CvEnum.DepthType.Cv64F, 1);
+      // arbitrary switch for testing
+      if (counter == 10)
+        ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("track.jpg");
 
-      ARKit.MatExtension.SetValue(ccc, 0, 0, 1);
-      ARKit.MatExtension.SetValue(ccc, 0, 1, 0);
-      ARKit.MatExtension.SetValue(ccc, 0, 2, 0);
-      ARKit.MatExtension.SetValue(ccc, 1, 0, 0);
-      ARKit.MatExtension.SetValue(ccc, 1, 1, 1);
-      ARKit.MatExtension.SetValue(ccc, 1, 2, 0);
-      ARKit.MatExtension.SetValue(ccc, 2, 0, 0);
-      ARKit.MatExtension.SetValue(ccc, 2, 1, 0);
-      ARKit.MatExtension.SetValue(ccc, 2, 2, 1);
+      // arbitrary condition for testing
+      if (counter < 10)
+        this.fp.ComputeAndMatch();
+      else
+        tracking = this.fp.TrackObject();
 
-      if (this.fp.GetPose(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat r, out Emgu.CV.Mat t))
+      // compute border points
+      MT.objectFound = this.fp.FindObject(!tracking);
+
+      // obtain pose by solvePnP
+      gotPose = this.fp.GetPose(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out r, out t);
+
+      // draw object border
+      if (gotPose)
         frame = this.fp.DrawObjectBorder(true, this.ip.CameraMatrix, this.ip.DistortionCoefficients, r, t);
       else
         frame = this.fp.DrawObjectBorder();
+
+      // load image to background texture
       this.backgroundTexture.LoadImage(frame.Image);
 
-      Camera cam = Camera.main;
-      if (fp.GetHomography(out Emgu.CV.Mat H))
+      
+      if (fp.GetHomography(out H) && gotPose)
       {
-        Emgu.CV.CvInvoke.Rodrigues(r.T(), r);
+        Emgu.CV.CvInvoke.Rodrigues(r, r);
 
-        Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
         Emgu.CV.Matrix<double> rm = new Emgu.CV.Matrix<double>(3, 3);
         Emgu.CV.Matrix<double> tm = new Emgu.CV.Matrix<double>(3, 1);
-        Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
         for (int i = 0; i < 3; i++)
         {
           for (int j = 0; j < 3; j++)
-          {
-            H_mat[i, j] = ARKit.MatExtension.GetValue(H, i, j);
             rm[i, j] = ARKit.MatExtension.GetValue(r, i, j);
-
-            cam_mat[i, j] = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
-
-            //if (i == 1 && (j == 1 || j == 2))
-            //  cam_mat[i, j] *= -1;
-
-          }
           tm[i, 0] = ARKit.MatExtension.GetValue(t, i, 0);
         }
 
-        Matrix4x4 h = new Matrix4x4()
+        rm = rm.Transpose();
+        // tm = -1 * rm * tm;
+
+        Vector3 position = new Vector3()
+        {
+          x = (float)(tm[0, 0] + ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 2)),
+          y = (float)(-tm[1, 0] + ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 2)),
+          z = (float)tm[2, 0]
+        };
+        
+        Vector4 rQ = ConvertRotationMatToQuaternion(rm);
+
+        cam.transform.position = -1 * position;
+        cam.transform.rotation = new Quaternion(rQ.x, -rQ.y, rQ.z, rQ.w);
+
+        // debugging section
+        Matrix4x4 hmat = new Matrix4x4()
         {
           m00 = ARKit.MatExtension.GetValue(H, 0, 0),
           m01 = ARKit.MatExtension.GetValue(H, 0, 1),
@@ -206,42 +218,26 @@ public class WebCamera : MonoBehaviour
           m32 = 0,
           m33 = 1,
         };
-        Matrix4x4 c = new Matrix4x4()
+        Matrix4x4 kmat = new Matrix4x4()
         {
-          m00 = (float)cam_mat[0, 0],
-          m01 = (float)cam_mat[0, 1],
-          m02 = (float)cam_mat[0, 2],
+          m00 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 0),
+          m01 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 1),
+          m02 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 0, 2),
           m03 = (float)0,
-          m10 = (float)cam_mat[1, 0],
-          m11 = (float)cam_mat[1, 1],
-          m12 = (float)cam_mat[1, 2],
+          m10 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 0),
+          m11 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 1),
+          m12 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 1, 2),
           m13 = (float)0,
-          m20 = (float)cam_mat[2, 0],
-          m21 = (float)cam_mat[2, 1],
-          m22 = (float)cam_mat[2, 2],
+          m20 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 0),
+          m21 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 1),
+          m22 = (float)ARKit.MatExtension.GetValue(this.ip.CameraMatrix, 2, 2),
           m23 = (float)0,
           m30 = (float)0,
           m31 = (float)0,
           m32 = (float)0,
-          m33 = (float)1,
+          m33 = (float)0,
         };
-
-        print("H " + h);
-        print("C " + c);
-
-        //rm = cam_mat * rm;
-        //tm = cam_mat * tm;
-
-        rm = rm.Transpose();
-
-        Vector3 position = new Vector3()
-        {
-          x = (float)-tm[0, 0],
-          y = (float)tm[1, 0],
-          z = (float)tm[2, 0]
-        };
-
-        Matrix4x4 rotation = new Matrix4x4()
+        Matrix4x4 emat = new Matrix4x4()
         {
           m00 = (float)rm[0, 0],
           m01 = (float)rm[0, 1],
@@ -258,137 +254,86 @@ public class WebCamera : MonoBehaviour
           m30 = 0,
           m31 = 0,
           m32 = 0,
-          m33 = 1,
+          m33 = 0,
         };
 
-        float T, S, X, Y, Z, W;
-
-        T = 1 + rotation[0] + rotation[5] + rotation[10];
-
-        if (T > 0.00000001)
-        {
-          S = Mathf.Sqrt(T) * 2;
-          X = (rotation[9] - rotation[6]) / S;
-          Y = (rotation[2] - rotation[8]) / S;
-          Z = (rotation[4] - rotation[1]) / S;
-          W = 0.25f * S;
-        }
-        else
-        {
-          if (rotation[0] > rotation[5] && rotation[0] > rotation[10])
-          { // Column 0: 
-            S = Mathf.Sqrt((float)(1.0 + rotation[0] - rotation[5] - rotation[10])) * 2;
-            X = 0.25f * S;
-            Y = (rotation[4] + rotation[1]) / S;
-            Z = (rotation[2] + rotation[8]) / S;
-            W = (rotation[9] - rotation[6]) / S;
-
-          }
-          else if (rotation[5] > rotation[10])
-          { // Column 1: 
-            S = Mathf.Sqrt((float)(1.0 + rotation[5] - rotation[0] - rotation[10])) * 2;
-            X = (rotation[4] + rotation[1]) / S;
-            Y = 0.25f * S;
-            Z = (rotation[9] + rotation[6]) / S;
-            W = (rotation[2] - rotation[8]) / S;
-
-          }
-          else
-          { // Column 2:
-            S = Mathf.Sqrt((float)(1.0 + rotation[10] - rotation[0] - rotation[5])) * 2;
-            X = (rotation[2] + rotation[8]) / S;
-            Y = (rotation[9] + rotation[6]) / S;
-            Z = 0.25f * S;
-            W = (rotation[4] - rotation[1]) / S;
-          }
-        }
-
-        X = -X;
-        //Y = -Y;
-        Z = -Z;
-        //W = -W;
-        cam.transform.position = -1 * position;
-        cam.transform.rotation = new Quaternion(X, Y, Z, W);
-        print(rotation);
-        print("T " + T + " S " + S + " X " + X + " Y " + Y + " Z " + Z + " W " + W);
+        print(hmat);
+        print(kmat);
+        print(emat);
         print("euler angles " + cam.transform.eulerAngles.x + " " + cam.transform.eulerAngles.y + " " + cam.transform.eulerAngles.z);
 
-        //Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
-        //proj[0, 3] /= 100000;
-        //proj[1, 3] /= -100000;
-        //proj[2, 3] /= -100000;
-
-        //this.fp.GetProjectionMatrix(this.ip.CameraMatrix, this.ip.DistortionCoefficients, out Emgu.CV.Mat projectionMat);
-
-        //Matrix4x4 proj_mat = Matrix4x4.identity;
-
-        /*for (int i = 0; i < 4; i++)
-        {
-          for (int j = 0; j < 4; j++)
-          {
-            proj_mat[i, j] = (float)proj[i, j];
-            //proj_mat[i, j] = (float)ARKit.MatExtension.GetValue(projectionMat, i, j);
-          }
-        }*/
-
-        //cam.worldToCameraMatrix = proj_mat;
-        //print("projection matrix set");
-        //print(cam.fieldOfView.ToString());
-        //print("world to camera matrix " + cam.worldToCameraMatrix.rotation.ToString());
-        //print("world to camera matrix " + cam.worldToCameraMatrix.ToString());
-        //print("projection matrix " + cam.projectionMatrix.rotation.ToString());
-        // print("projection matrix " + cam.projectionMatrix.ToString());
-        //print("top " + cam.projectionMatrix.decomposeProjection.top + " bottom " + cam.projectionMatrix.decomposeProjection.bottom
-        //  + " right " + cam.projectionMatrix.decomposeProjection.right + " left " + cam.projectionMatrix.decomposeProjection.left
-        //  + " znear " + cam.projectionMatrix.decomposeProjection.zNear + " zfar " + cam.projectionMatrix.decomposeProjection.zFar);
+        // arbitrary condition update
+        counter++;
       }
-
-      //ARKit.Memory.Frame = Emgu.CV.CvInvoke.Imread("track.jpg");
-
-      //this.fp.TrackObject();
-      //MT.objectFound = this.fp.FindObject(false);
-      //frame = this.fp.DrawObjectBorder();
-      //this.backgroundTexture.LoadImage(frame.Image);
-
-      //if (fp.GetHomography(out H))
-      //{
-      //  Emgu.CV.Matrix<double> H_mat = new Emgu.CV.Matrix<double>(3, 3);
-      //  Emgu.CV.Matrix<double> cam_mat = new Emgu.CV.Matrix<double>(3, 3);
-      //  for (int i = 0; i < 3; i++)
-      //  {
-      //    for (int j = 0; j < 3; j++)
-      //    {
-      //      double val = ARKit.MatExtension.GetValue(H, i, j);
-      //      print("i: " + i.ToString());
-      //      print("j: " + j.ToString());
-      //      H_mat[i, j] = val;
-
-      //      val = ARKit.MatExtension.GetValue(ip.CameraMatrix, i, j);
-      //      cam_mat[i, j] = val;
-      //    }
-      //  }
-      //  Emgu.CV.Matrix<double> proj = this.fp.projection_mat(H_mat, cam_mat);
-
-
-      //  Matrix4x4 proj_mat = Matrix4x4.identity;
-
-
-      //  for (int i = 0; i < 4; i++)
-      //  {
-      //    for (int j = 0; j < 4; j++)
-      //    {
-      //      double val = proj[i, j];
-      //      int val_proj = (int)val;
-
-      //      proj_mat[i, j] = val_proj;
-      //    }
-      //  }
-
-      //  cam.projectionMatrix = proj_mat;
-      //  print("projection matrix set");
-
-      //}
-
     }
+  }
+
+  private Vector4 ConvertRotationMatToQuaternion(Emgu.CV.Matrix<double> rotationMat)
+  {
+    float T, S, X, Y, Z, W;
+
+    Matrix4x4 rotation = new Matrix4x4()
+    {
+      m00 = (float)rotationMat[0, 0],
+      m01 = (float)rotationMat[0, 1],
+      m02 = (float)rotationMat[0, 2],
+      m03 = 0,
+      m10 = (float)rotationMat[1, 0],
+      m11 = (float)rotationMat[1, 1],
+      m12 = (float)rotationMat[1, 2],
+      m13 = 0,
+      m20 = (float)rotationMat[2, 0],
+      m21 = (float)rotationMat[2, 1],
+      m22 = (float)rotationMat[2, 2],
+      m23 = 0,
+      m30 = 0,
+      m31 = 0,
+      m32 = 0,
+      m33 = 0,
+    };
+
+    T = 1 + rotation[0] + rotation[5] + rotation[10];
+
+    if (T > 0.00000001)
+    {
+      S = Mathf.Sqrt(T) * 2;
+      X = (rotation[9] - rotation[6]) / S;
+      Y = (rotation[2] - rotation[8]) / S;
+      Z = (rotation[4] - rotation[1]) / S;
+      W = 0.25f * S;
+    }
+    else
+    {
+      if (rotation[0] > rotation[5] && rotation[0] > rotation[10])
+      { // Column 0: 
+        S = Mathf.Sqrt((float)(1.0 + rotation[0] - rotation[5] - rotation[10])) * 2;
+        X = 0.25f * S;
+        Y = (rotation[4] + rotation[1]) / S;
+        Z = (rotation[2] + rotation[8]) / S;
+        W = (rotation[9] - rotation[6]) / S;
+
+      }
+      else if (rotation[5] > rotation[10])
+      { // Column 1: 
+        S = Mathf.Sqrt((float)(1.0 + rotation[5] - rotation[0] - rotation[10])) * 2;
+        X = (rotation[4] + rotation[1]) / S;
+        Y = 0.25f * S;
+        Z = (rotation[9] + rotation[6]) / S;
+        W = (rotation[2] - rotation[8]) / S;
+
+      }
+      else
+      { // Column 2:
+        S = Mathf.Sqrt((float)(1.0 + rotation[10] - rotation[0] - rotation[5])) * 2;
+        X = (rotation[2] + rotation[8]) / S;
+        Y = (rotation[9] + rotation[6]) / S;
+        Z = 0.25f * S;
+        W = (rotation[4] - rotation[1]) / S;
+      }
+    }
+
+    print("T " + T + " S " + S + " X " + X + " Y " + Y + " Z " + Z + " W " + W);
+
+    return new Vector4(X, Y, Z, W);
   }
 }
